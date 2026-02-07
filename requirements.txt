@@ -1,0 +1,65 @@
+# ============================================================
+# CallPilot — Dependencies
+# ============================================================
+
+# -- Web Framework ------------------------------------------------
+# FastAPI is a modern, async-first Python web framework.
+# It serves our API routes (REST + WebSocket) and auto-generates
+# interactive docs at /docs (Swagger UI).
+fastapi==0.115.0
+
+# Uvicorn is the ASGI server that actually *runs* FastAPI.
+# The [standard] extra bundles websockets + httptools for speed.
+uvicorn[standard]==0.30.6
+
+# -- ElevenLabs ---------------------------------------------------
+# The official ElevenLabs Python SDK.
+# We use it for:
+#   • Conversational AI — real-time voice agent over WebSocket
+#   • Agentic Functions — lets the voice AI call our Python tools
+#     (check calendar, find providers, etc.) MID-conversation
+elevenlabs==1.50.5
+
+# -- Telephony (Phone Calls) --------------------------------------
+# Twilio makes the actual phone calls.
+# ElevenLabs handles the *voice AI*; Twilio handles the *telephony*
+# (dialing numbers, bridging audio, SIP trunking).
+twilio==9.4.1
+
+# -- Google APIs ---------------------------------------------------
+# Google's unified API client — we'll use it for:
+#   • Google Calendar API  → check availability, create events
+#   • Google Places API    → find nearby providers + ratings
+#   • Maps Distance Matrix → calculate travel time between locations
+google-api-python-client==2.155.0
+
+# OAuth2 authentication flow for Google Calendar.
+# Calendar requires user consent (OAuth), unlike Places (API key only).
+google-auth-oauthlib==1.2.1
+
+# -- Environment & Config -----------------------------------------
+# Loads variables from a .env file into os.environ.
+# Keeps API keys OUT of your source code. Essential for security.
+python-dotenv==1.0.1
+
+# -- HTTP Client ---------------------------------------------------
+# httpx is an async-capable HTTP client (like requests, but async).
+# Inside FastAPI async routes, you MUST use an async client to avoid
+# blocking the event loop. httpx handles that perfectly.
+httpx==0.28.1
+
+# -- WebSocket Client ----------------------------------------------
+# Low-level WebSocket support. ElevenLabs Conversational AI streams
+# audio over WebSockets in real-time (send mic audio, receive voice).
+websockets==13.1
+
+# -- Data Validation -----------------------------------------------
+# Pydantic v2 — data models with automatic validation.
+# FastAPI uses Pydantic under the hood, but we pin it explicitly
+# so our custom schemas stay version-consistent.
+pydantic==2.10.0
+
+# -- Utilities -----------------------------------------------------
+# Flexible date/time parsing. When a user says "next Tuesday at 3pm",
+# we need to turn that into a real datetime object for calendar logic.
+python-dateutil==2.9.0
