@@ -34,17 +34,6 @@ Scheduling an appointment is a surprisingly painful process. You search for prov
 
 ---
 
-## Demos
-
-### Full Product Demo
-
-https://github.com/abdullahejazjanjua/hackathon/blob/dev/demo-video.mov
-
-### Technical Walkthrough
-
-https://github.com/abdullahejazjanjua/hackathon/blob/dev/technical-video-demo.mp4
-
----
 
 ## How It Works
 
