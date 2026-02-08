@@ -38,15 +38,11 @@ Scheduling an appointment is a surprisingly painful process. You search for prov
 
 ### Full Product Demo
 
-https://github.com/user-attachments/assets/demo-video.mov
-
-[demo-video.mov](./demo-video.mov)
+https://github.com/abdullahejazjanjua/hackathon/blob/dev/demo-video.mov
 
 ### Technical Walkthrough
 
-https://github.com/user-attachments/assets/technical-video-demo.mp4
-
-[technical-video-demo.mp4](./technical-video-demo.mp4)
+https://github.com/abdullahejazjanjua/hackathon/blob/dev/technical-video-demo.mp4
 
 ---
 
@@ -178,8 +174,8 @@ hackathon/
 ### 1. Clone & install backend dependencies
 
 ```bash
-git clone https://github.com/your-org/callpilot.git
-cd callpilot
+git clone https://github.com/abdullahejazjanjua/hackathon.git
+cd hackathon
 pip install -r requirements.txt
 ```
 
