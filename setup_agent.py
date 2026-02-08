@@ -6,10 +6,10 @@ Run this script to create or update your ElevenLabs agent.
 
 USAGE:
   # Create a new agent (first time only):
-  python setup_agent.py create --server-url https://YOUR-NGROK-URL.ngrok.io
+  python setup_agent.py create --server-url https://YOUR-URL.trycloudflare.com
 
-  # Update existing agent (when ngrok URL changes):
-  python setup_agent.py update --server-url https://YOUR-NEW-NGROK-URL.ngrok.io
+  # Update existing agent (when cloudflared URL changes):
+  python setup_agent.py update --server-url https://YOUR-NEW-URL.trycloudflare.com
 
   # View current agent config:
   python setup_agent.py info
@@ -24,7 +24,7 @@ WHAT THIS DOES:
 PREREQUISITES:
   1. ELEVENLABS_API_KEY set in .env
   2. Your FastAPI server running (uvicorn app.main:app)
-  3. ngrok running (ngrok http 8000) — gives you a public URL
+  3. cloudflared running (cloudflared tunnel --url http://localhost:8000)
 """
 
 import argparse
@@ -53,10 +53,10 @@ def cmd_create(args):
 
     if server_url == "http://localhost:8000":
         print("⚠️  WARNING: Using localhost as server URL.")
-        print("   ElevenLabs can't reach localhost! Use ngrok:")
-        print("   1. Run: ngrok http 8000")
+        print("   ElevenLabs can't reach localhost! Use Cloudflare Tunnel:")
+        print("   1. Run: cloudflared tunnel --url http://localhost:8000")
         print("   2. Copy the https URL")
-        print("   3. Re-run: python setup_agent.py create --server-url https://YOUR-URL.ngrok.io")
+        print("   3. Re-run: python setup_agent.py create --server-url https://YOUR-URL.trycloudflare.com")
         print()
         proceed = input("   Continue anyway (for local testing)? [y/N]: ").strip().lower()
         if proceed != 'y':
@@ -135,8 +135,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python setup_agent.py create --server-url https://abc123.ngrok.io
-  python setup_agent.py update --server-url https://new-url.ngrok.io
+  python setup_agent.py create --server-url https://abc123.trycloudflare.com
+  python setup_agent.py update --server-url https://new-url.trycloudflare.com
   python setup_agent.py info
         """,
     )

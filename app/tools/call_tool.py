@@ -1,45 +1,32 @@
 """
-CallPilot — Twilio Call Tool (REAL Outbound Phone Calls)
-==========================================================
-This tool makes REAL outbound phone calls to service providers
-using Twilio's API.
+CallPilot — Simulated Call Tool
+=================================
+This tool SIMULATES outbound phone calls to service providers.
+No Twilio dependency — calls are simulated in-memory with realistic
+status progression, transcripts, and the same API contract.
 
 WHAT IT DOES:
-  1. call_to_inquire()  → Calls a provider to ASK for available slots
-  2. initiate_call()    → Calls a provider to CONFIRM a booked appointment
-  3. get_call_status()  → Checks the status of an active call
+  1. call_to_inquire()  → Simulates calling a provider to ASK for available slots
+  2. initiate_call()    → Simulates calling a provider to CONFIRM a booked appointment
+  3. get_call_status()  → Checks the status of a simulated call
 
-HOW THE "CALL-FIRST" FLOW WORKS:
-  1. Agent finds providers (names, phones, ratings — NO hardcoded slots)
+HOW THE SIMULATED "CALL-FIRST" FLOW WORKS:
+  1. Agent finds providers (names, phones, ratings)
   2. Agent calls a provider via call_to_inquire()
-  3. Twilio dials the provider's phone — YOUR PHONE RINGS
-  4. When answered, our AI CALLER introduces itself and asks for slots
-  5. Meanwhile, we look up their actual schedule and return it
+  3. We simulate the call lifecycle (initiated → ringing → answered → completed)
+  4. We look up the provider's actual schedule and return the slots
+  5. A realistic transcript is generated showing the AI–provider conversation
   6. Agent presents slots to the user, user picks one
   7. Agent books the appointment on Google Calendar
   8. Optionally, agent calls again via initiate_call() to confirm
-
-PREREQUISITES:
-  1. Create a Twilio account at https://www.twilio.com
-  2. Get a phone number (free trial includes one)
-  3. Add credentials to .env:
-     TWILIO_ACCOUNT_SID=ACxxxxxxxxx
-     TWILIO_AUTH_TOKEN=your_auth_token
-     TWILIO_PHONE_NUMBER=+1xxxxxxxxxx
 """
 
 import logging
-import urllib.parse
+import random
+import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
-
-from app.config import (
-    TWILIO_ACCOUNT_SID,
-    TWILIO_AUTH_TOKEN,
-    TWILIO_PHONE_NUMBER,
-    SERVER_URL,
-)
 
 logger = logging.getLogger("callpilot.calls")
 
@@ -47,25 +34,148 @@ logger = logging.getLogger("callpilot.calls")
 ACTIVE_CALLS: dict = {}  # call_sid → call details
 
 
-def _is_twilio_configured() -> bool:
-    """Check if Twilio credentials are set."""
-    return bool(TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_PHONE_NUMBER)
+def _generate_call_sid() -> str:
+    """Generate a realistic simulated call SID."""
+    return f"SIM_{uuid.uuid4().hex[:12]}"
 
 
-def _get_twilio_client():
-    """Get a Twilio REST client."""
-    if not _is_twilio_configured():
-        return None
+def _generate_simulated_slots(date: str, count: int = 4) -> list[str]:
+    """
+    Generate realistic simulated appointment slots for a given date.
 
+    Used when a provider (e.g. from Mapbox) has no slot data in providers.json.
+    Returns ISO-8601 datetime strings for business-hours slots.
+    """
     try:
-        from twilio.rest import Client
-        return Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-    except ImportError:
-        logger.error("[CALL] Twilio library not installed. Run: pip install twilio")
-        return None
-    except Exception as e:
-        logger.error(f"[CALL] Failed to create Twilio client: {e}")
-        return None
+        base = datetime.strptime(date, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        base = datetime.now() + timedelta(days=1)
+        base = base.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Possible appointment times during business hours (9 AM - 5 PM)
+    possible_hours = [9, 10, 11, 12, 13, 14, 15, 16]
+    possible_minutes = [0, 30]
+
+    all_times = []
+    for h in possible_hours:
+        for m in possible_minutes:
+            all_times.append((h, m))
+
+    # Pick a random subset
+    selected = random.sample(all_times, min(count, len(all_times)))
+    selected.sort()
+
+    slots = []
+    for h, m in selected:
+        slot_dt = base.replace(hour=h, minute=m, second=0, microsecond=0)
+        slots.append(slot_dt.isoformat())
+
+    return slots
+
+
+def _simulate_call_lifecycle(call_sid: str) -> None:
+    """
+    Simulate a call going through its lifecycle stages.
+    Updates ACTIVE_CALLS status as it progresses.
+    """
+    stages = ["initiated", "ringing", "in-progress", "completed"]
+    for stage in stages:
+        if call_sid in ACTIVE_CALLS:
+            ACTIVE_CALLS[call_sid]["status"] = stage
+            logger.info(f"[SIM] Call {call_sid[:16]}... status → {stage}")
+        time.sleep(0.3)  # Brief delay between stages
+
+
+def _build_inquiry_transcript(
+    provider_name: str,
+    patient_name: str,
+    service_type: str,
+    date: str,
+    slot_times: list[str],
+) -> list[dict]:
+    """Build a realistic simulated transcript for an inquiry call."""
+    transcript = [
+        {
+            "role": "agent",
+            "text": (
+                f"Hello, I'm calling from CallPilot, an AI scheduling assistant. "
+                f"I'm calling on behalf of {patient_name} who would like to schedule "
+                f"a {service_type.replace('_', ' ')} appointment on {date}. "
+                f"Could you tell me your available appointment slots?"
+            ),
+        },
+        {
+            "role": "provider",
+            "text": (
+                f"Hi, this is {provider_name}. Let me check our schedule for {date}."
+            ),
+        },
+    ]
+
+    if slot_times:
+        slots_str = ", ".join(slot_times)
+        transcript.append({
+            "role": "provider",
+            "text": f"We have the following slots available: {slots_str}.",
+        })
+        transcript.append({
+            "role": "agent",
+            "text": (
+                f"That's great. I'll pass those options along to {patient_name}. "
+                f"Thank you for your time!"
+            ),
+        })
+        transcript.append({
+            "role": "provider",
+            "text": "You're welcome. We look forward to seeing them!",
+        })
+    else:
+        transcript.append({
+            "role": "provider",
+            "text": f"I'm sorry, we don't have any openings on {date}.",
+        })
+        transcript.append({
+            "role": "agent",
+            "text": "I understand. Thank you for checking. Goodbye!",
+        })
+
+    return transcript
+
+
+def _build_confirmation_transcript(
+    provider_name: str,
+    patient_name: str,
+    service_type: str,
+    appointment_time: str,
+) -> list[dict]:
+    """Build a realistic simulated transcript for a confirmation call."""
+    return [
+        {
+            "role": "agent",
+            "text": (
+                f"Hello, I'm calling from CallPilot, an AI scheduling assistant. "
+                f"I'm calling to confirm an appointment for {patient_name} "
+                f"at {appointment_time} for a {service_type.replace('_', ' ')} visit. "
+                f"Can you confirm this is booked?"
+            ),
+        },
+        {
+            "role": "provider",
+            "text": (
+                f"Hi, this is {provider_name}. Let me verify that... "
+                f"Yes, I can confirm {patient_name} is booked for "
+                f"{appointment_time}."
+            ),
+        },
+        {
+            "role": "agent",
+            "text": "Wonderful, thank you for confirming. Have a great day!",
+        },
+        {
+            "role": "provider",
+            "text": "Thank you, goodbye!",
+        },
+    ]
 
 
 # ══════════════════════════════════════════════════════════
@@ -80,28 +190,25 @@ def call_to_inquire(
     patient_name: str = "CallPilot User",
 ) -> dict:
     """
-    📞 Call a provider to ask about available appointment slots.
+    Simulate calling a provider to ask about available appointment slots.
 
     This is the KEY tool in the call-first flow:
-    1. Makes a REAL Twilio call to the provider's phone (phone rings!)
-    2. Our AI caller introduces itself and asks for available slots
-    3. We look up the provider's actual schedule and return it
+    1. Simulates a phone call to the provider
+    2. Looks up the provider's actual schedule
+    3. Returns available slots with a simulated transcript
     4. The agent presents the slots to the user
-
-    The phone call serves as PROOF that the provider was contacted.
-    The call SID can be verified on the Twilio dashboard.
 
     Args:
         provider_phone: Provider's phone number (E.164 format)
         provider_name: Provider's business name
         date: Date to check (YYYY-MM-DD format)
         service_type: Type of service (e.g., 'dentist', 'doctor')
-        patient_name: Patient's name (to introduce on the call)
+        patient_name: Patient's name
 
     Returns:
         dict with: available_slots, call_sid, call_status, provider info
     """
-    logger.info(f"[INQUIRE] 📞 Calling {provider_name} ({provider_phone}) to check slots on {date}")
+    logger.info(f"[INQUIRE] Simulating call to {provider_name} ({provider_phone}) for slots on {date}")
 
     # ── 1. Look up the provider's schedule ────────────────
     from app.tools.provider_tool import get_provider_slots
@@ -110,6 +217,11 @@ def call_to_inquire(
         date=date,
         provider_name=provider_name,
     )
+
+    # If no slots found (e.g. Mapbox provider not in JSON), generate simulated ones
+    if not raw_slots:
+        logger.info(f"[INQUIRE] No stored slots for {provider_name}. Generating simulated slots.")
+        raw_slots = _generate_simulated_slots(date, count=4)
 
     # Format slots for readability
     formatted_slots = []
@@ -124,13 +236,14 @@ def call_to_inquire(
         except (ValueError, TypeError):
             formatted_slots.append({"datetime": slot, "time": slot})
 
-    # ── 2. Initiate a REAL phone call ─────────────────────
-    call_result = _initiate_inquiry_call(
+    # ── 2. Simulate the phone call ────────────────────────
+    call_result = _simulate_inquiry_call(
         provider_phone=provider_phone,
         provider_name=provider_name,
         date=date,
         service_type=service_type,
         patient_name=patient_name,
+        slot_times=[s["time"] for s in formatted_slots],
     )
 
     call_sid = call_result.get("call_sid", "N/A")
@@ -168,82 +281,51 @@ def call_to_inquire(
     }
 
 
-def _initiate_inquiry_call(
+def _simulate_inquiry_call(
     provider_phone: str,
     provider_name: str,
     date: str,
     service_type: str,
     patient_name: str,
+    slot_times: list[str],
 ) -> dict:
     """
-    Start a Twilio call for an availability inquiry.
-
-    When the provider answers, Twilio connects to our /call/twiml endpoint,
-    which returns TwiML to stream audio to our WebSocket bridge,
-    where our AI caller speaks to whoever picks up.
+    Simulate an inquiry call with lifecycle progression and transcript.
     """
-    if not _is_twilio_configured():
-        logger.warning("[INQUIRE] Twilio not configured. Simulating call.")
-        mock_sid = f"MOCK_{uuid.uuid4().hex[:12]}"
-        ACTIVE_CALLS[mock_sid] = {
-            "call_sid": mock_sid, "status": "simulated",
-            "type": "inquiry", "to": provider_phone,
-            "provider_name": provider_name, "date": date,
-        }
-        return {"success": True, "call_sid": mock_sid, "status": "simulated"}
+    call_sid = _generate_call_sid()
 
-    if not SERVER_URL or SERVER_URL == "http://localhost:8000":
-        logger.error("[INQUIRE] SERVER_URL must be a public URL (ngrok).")
-        return {"success": False, "call_sid": None, "status": "failed",
-                "message": "SERVER_URL not set to a public URL."}
+    # Build simulated transcript
+    transcript = _build_inquiry_transcript(
+        provider_name=provider_name,
+        patient_name=patient_name,
+        service_type=service_type,
+        date=date,
+        slot_times=slot_times,
+    )
 
-    client = _get_twilio_client()
-    if not client:
-        return {"success": False, "call_sid": None, "status": "failed",
-                "message": "Failed to create Twilio client."}
-
-    # Build the TwiML URL — Twilio will fetch this when the call connects
-    params = urllib.parse.urlencode({
+    # Track the call
+    ACTIVE_CALLS[call_sid] = {
+        "call_sid": call_sid,
+        "status": "initiated",
+        "type": "inquiry",
+        "to": provider_phone,
+        "from": "+1-CALLPILOT",
         "provider_name": provider_name,
         "date": date,
         "service_type": service_type,
         "patient_name": patient_name,
-        "call_type": "inquiry",   # ← tells the TwiML handler this is an inquiry call
-    })
-    twiml_url = f"{SERVER_URL}/call/twiml?{params}"
+        "transcript": transcript,
+        "duration": "15",
+        "simulated": True,
+    }
 
-    logger.info(f"[INQUIRE] Dialing {provider_phone} via Twilio...")
-    logger.info(f"[INQUIRE] TwiML URL: {twiml_url}")
+    logger.info(f"[SIM] Simulating inquiry call to {provider_name}...")
 
-    try:
-        call = client.calls.create(
-            to=provider_phone,
-            from_=TWILIO_PHONE_NUMBER,
-            url=twiml_url,
-            status_callback=f"{SERVER_URL}/call/status",
-            status_callback_event=["initiated", "ringing", "answered", "completed"],
-            timeout=30,
-        )
+    # Simulate call lifecycle
+    _simulate_call_lifecycle(call_sid)
 
-        ACTIVE_CALLS[call.sid] = {
-            "call_sid": call.sid,
-            "status": call.status,
-            "type": "inquiry",
-            "to": provider_phone,
-            "from": TWILIO_PHONE_NUMBER,
-            "provider_name": provider_name,
-            "date": date,
-            "service_type": service_type,
-            "patient_name": patient_name,
-        }
-
-        logger.info(f"[INQUIRE] ✅ Call initiated! SID: {call.sid}")
-        return {"success": True, "call_sid": call.sid, "status": call.status}
-
-    except Exception as e:
-        logger.error(f"[INQUIRE] ❌ Failed to initiate call: {e}")
-        return {"success": False, "call_sid": None, "status": "failed",
-                "message": str(e)}
+    logger.info(f"[SIM] Inquiry call completed: {call_sid}")
+    return {"success": True, "call_sid": call_sid, "status": "completed"}
 
 
 # ══════════════════════════════════════════════════════════
@@ -258,10 +340,10 @@ def initiate_call(
     patient_name: str = "CallPilot User",
 ) -> dict:
     """
-    Initiate a real outbound phone call to CONFIRM a booked appointment.
+    Simulate an outbound phone call to CONFIRM a booked appointment.
 
-    This is used AFTER the user has booked. The AI calls the provider
-    and confirms the appointment details.
+    This is used AFTER the user has booked. The simulated AI calls
+    the provider and confirms the appointment details.
 
     Args:
         provider_phone: Provider's phone number (E.164 format)
@@ -273,76 +355,51 @@ def initiate_call(
     Returns:
         dict with: success, call_sid, status, message
     """
-    if not _is_twilio_configured():
-        logger.warning("[CALL] Twilio not configured. Simulating call.")
-        return _mock_call(provider_phone, provider_name, appointment_time, service_type)
+    call_sid = _generate_call_sid()
 
-    if not SERVER_URL or SERVER_URL == "http://localhost:8000":
-        return {
-            "success": False, "call_sid": None, "status": "failed",
-            "message": "SERVER_URL must be a public URL (ngrok).",
-        }
+    # Build simulated transcript
+    transcript = _build_confirmation_transcript(
+        provider_name=provider_name,
+        patient_name=patient_name,
+        service_type=service_type,
+        appointment_time=appointment_time,
+    )
 
-    client = _get_twilio_client()
-    if not client:
-        return {
-            "success": False, "call_sid": None, "status": "failed",
-            "message": "Failed to create Twilio client. Check credentials.",
-        }
-
-    # Build the TwiML URL for a confirmation call
-    params = urllib.parse.urlencode({
+    # Track the call
+    ACTIVE_CALLS[call_sid] = {
+        "call_sid": call_sid,
+        "status": "initiated",
+        "type": "confirmation",
+        "to": provider_phone,
+        "from": "+1-CALLPILOT",
         "provider_name": provider_name,
         "appointment_time": appointment_time,
-        "patient_name": patient_name,
         "service_type": service_type,
-        "call_type": "confirmation",  # ← tells TwiML handler this is a confirmation
-    })
-    twiml_url = f"{SERVER_URL}/call/twiml?{params}"
+        "patient_name": patient_name,
+        "transcript": transcript,
+        "duration": "12",
+        "simulated": True,
+    }
 
-    try:
-        call = client.calls.create(
-            to=provider_phone,
-            from_=TWILIO_PHONE_NUMBER,
-            url=twiml_url,
-            status_callback=f"{SERVER_URL}/call/status",
-            status_callback_event=["initiated", "ringing", "answered", "completed"],
-            timeout=30,
-        )
+    logger.info(f"[SIM] Simulating confirmation call to {provider_name}...")
 
-        ACTIVE_CALLS[call.sid] = {
-            "call_sid": call.sid,
-            "status": call.status,
-            "type": "confirmation",
-            "to": provider_phone,
-            "from": TWILIO_PHONE_NUMBER,
-            "provider_name": provider_name,
-            "appointment_time": appointment_time,
-            "service_type": service_type,
-            "patient_name": patient_name,
-        }
+    # Simulate call lifecycle
+    _simulate_call_lifecycle(call_sid)
 
-        logger.info(f"[CALL] 📞 Confirmation call initiated! SID: {call.sid}")
+    logger.info(f"[SIM] Confirmation call completed: {call_sid}")
 
-        return {
-            "success": True,
-            "call_sid": call.sid,
-            "status": call.status,
-            "provider_name": provider_name,
-            "provider_phone": provider_phone,
-            "message": (
-                f"Phone call initiated to {provider_name} at {provider_phone} "
-                f"to confirm appointment for {patient_name} at {appointment_time}. "
-                f"Call SID: {call.sid}."
-            ),
-        }
-
-    except Exception as e:
-        logger.error(f"[CALL] ❌ Failed to initiate call: {e}")
-        return {
-            "success": False, "call_sid": None, "status": "failed",
-            "message": f"Failed to call {provider_name}: {str(e)}",
-        }
+    return {
+        "success": True,
+        "call_sid": call_sid,
+        "status": "completed",
+        "provider_name": provider_name,
+        "provider_phone": provider_phone,
+        "message": (
+            f"Phone call completed to {provider_name} at {provider_phone} "
+            f"to confirm appointment for {patient_name} at {appointment_time}. "
+            f"The provider confirmed the booking. Call SID: {call_sid}."
+        ),
+    }
 
 
 # ══════════════════════════════════════════════════════════
@@ -350,60 +407,27 @@ def initiate_call(
 # ══════════════════════════════════════════════════════════
 
 def get_call_status(call_sid: str) -> dict:
-    """Get the current status of an active call from Twilio."""
-    if not _is_twilio_configured():
-        return {"success": False, "message": "Twilio not configured"}
-
-    client = _get_twilio_client()
-    if not client:
-        return {"success": False, "message": "Failed to create Twilio client"}
-
-    try:
-        call = client.calls(call_sid).fetch()
+    """Get the current status of a call from in-memory tracking."""
+    if call_sid in ACTIVE_CALLS:
+        call = ACTIVE_CALLS[call_sid]
         return {
             "success": True,
-            "call_sid": call.sid,
-            "status": call.status,
-            "duration": call.duration,
-            "direction": call.direction,
-            "to": call.to,
+            "call_sid": call_sid,
+            "status": call.get("status", "unknown"),
+            "duration": call.get("duration", "0"),
+            "direction": "outbound",
+            "to": call.get("to", ""),
+            "simulated": True,
         }
-    except Exception as e:
-        logger.error(f"[CALL] Failed to get call status: {e}")
-        return {"success": False, "message": str(e)}
+
+    return {
+        "success": False,
+        "message": f"Call {call_sid} not found in active calls.",
+    }
 
 
 def update_call_status(call_sid: str, status: str) -> None:
-    """Update the tracked status of a call (from Twilio webhook)."""
+    """Update the tracked status of a call."""
     if call_sid in ACTIVE_CALLS:
         ACTIVE_CALLS[call_sid]["status"] = status
-        logger.info(f"[CALL] 📞 Call {call_sid[:12]}... status → {status}")
-
-
-def _mock_call(
-    provider_phone: str,
-    provider_name: str,
-    appointment_time: str,
-    service_type: str,
-) -> dict:
-    """Simulate a call when Twilio is not configured."""
-    mock_sid = f"MOCK_{uuid.uuid4().hex[:12]}"
-    logger.info(f"[CALL] 📞 MOCK call to {provider_name} ({provider_phone})")
-
-    ACTIVE_CALLS[mock_sid] = {
-        "call_sid": mock_sid, "status": "simulated",
-        "type": "confirmation", "to": provider_phone,
-        "provider_name": provider_name,
-    }
-
-    return {
-        "success": True,
-        "call_sid": mock_sid,
-        "status": "simulated",
-        "provider_name": provider_name,
-        "provider_phone": provider_phone,
-        "message": (
-            f"SIMULATED call to {provider_name} at {provider_phone}. "
-            f"(Configure Twilio in .env for real calls)"
-        ),
-    }
+        logger.info(f"[CALL] Call {call_sid[:16]}... status -> {status}")

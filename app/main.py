@@ -16,8 +16,8 @@ WHAT IS FastAPI?
 
 ARCHITECTURE — HOW ALL THE PIECES FIT:
   ┌─────────────┐         ┌──────────────┐         ┌─────────────┐
-  │   Twilio     │ ──────▶│  FastAPI      │ ──────▶│ ElevenLabs  │
-  │ (phone call) │ ◀──────│  (our server) │ ◀──────│ (voice AI)  │
+  │  Simulated   │ ──────▶│  FastAPI      │ ──────▶│ ElevenLabs  │
+  │  Phone Calls │ ◀──────│  (our server) │ ◀──────│ (voice AI)  │
   └─────────────┘         └──────────────┘         └─────────────┘
                                 │
                           ┌─────┴──────┐
@@ -71,7 +71,7 @@ app = FastAPI(
     title="CallPilot",
     description=(
         "Agentic Voice AI for Autonomous Appointment Scheduling.\n\n"
-        "Powered by ElevenLabs Conversational AI + Twilio.\n\n"
+        "Powered by ElevenLabs Conversational AI with simulated phone calls.\n\n"
         "## How it works\n"
         "1. **Create an agent** via `/agent/create` with your ngrok URL\n"
         "2. ElevenLabs voice AI handles conversations\n"
@@ -142,14 +142,12 @@ async def root():
                 "schedule": "POST /swarm/schedule",
                 "webhook": "POST /tools/swarm-schedule",
             },
-            "calls": {
-                "call_to_inquire": "POST /tools/call-to-inquire (call to ask about slots)",
-                "call_provider": "POST /tools/call-provider (call to confirm booking)",
+            "calls (simulated)": {
+                "call_to_inquire": "POST /tools/call-to-inquire (simulated call to ask about slots)",
+                "call_provider": "POST /tools/call-provider (simulated call to confirm booking)",
                 "outbound": "POST /call/outbound",
-                "twiml": "POST /call/twiml",
-                "media_stream": "WS /call/media-stream",
-                "status": "POST /call/status",
                 "active": "GET /call/active",
+                "status": "GET /call/status/{call_sid}",
             },
         },
     }

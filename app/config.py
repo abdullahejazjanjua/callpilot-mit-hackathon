@@ -61,7 +61,7 @@ APP_HOST: str = os.getenv("APP_HOST", "0.0.0.0")
 APP_PORT: int = int(os.getenv("APP_PORT", "8000"))
 DEBUG: bool = os.getenv("DEBUG", "true").lower() == "true"
 
-# Public URL for webhook tools (ngrok URL or deployed URL).
+# Public URL for webhook tools (Cloudflare Tunnel URL or deployed URL).
 # ElevenLabs needs this to reach your /tools/* endpoints.
-# Set after starting ngrok: ngrok http 8000
+# Set after starting: cloudflared tunnel --url http://localhost:8000
 SERVER_URL: str = os.getenv("SERVER_URL", "http://localhost:8000")
