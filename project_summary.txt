@@ -1,0 +1,9 @@
+CallPilot — Autonomous Voice AI for Appointment Scheduling
+
+Booking appointments is a frustrating, manual process. You search for providers, call them one by one, check your own calendar, compare options, and hope something works. CallPilot eliminates this entirely with a single voice command.
+
+CallPilot is an autonomous AI agent that schedules appointments end-to-end through natural voice conversation. When a user says "I need a dentist tomorrow," CallPilot doesn't ask them to pick from a list — it takes over. Using Swarm Mode, the agent simultaneously calls up to 15 providers in parallel, checks the user's Google Calendar for conflicts, calculates travel distance to each provider, and scores every option using a composite algorithm weighted by rating (40%), proximity (30%), and earliest availability (30%). Within seconds, it selects the single best match and books it automatically.
+
+The system is built on ElevenLabs Conversational AI for real-time voice interaction, backed by a FastAPI server that orchestrates tool calls as webhooks. The Swarm orchestrator uses parallel threading to simulate calling all providers at once — turning what would be 15 sequential phone calls into one simultaneous operation. A live status terminal on the React frontend streams real-time Server-Sent Events from the backend, so users can watch the agent work: finding providers, calling them, scoring results, and confirming the booking.
+
+CallPilot transforms appointment scheduling from a 20-minute chore into a 30-second conversation. One voice command. Every provider called. Best option booked. Calendar updated. Done.

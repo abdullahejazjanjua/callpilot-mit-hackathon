@@ -1,17 +1,5 @@
 #!/usr/bin/env python3
-"""
-CallPilot — Receptionist Agent Setup
-======================================
-Creates a SEPARATE ElevenLabs agent that acts as a clinic receptionist.
-
-When CallPilot calls a provider (via Twilio), the call connects to this
-receptionist agent. The receptionist answers the phone, confirms appointment
-details, and provides available slots.
-
-Usage:
-    python setup_receptionist.py create
-    python setup_receptionist.py update
-"""
+"""Setup script for the clinic receptionist ElevenLabs agent."""
 
 import argparse
 import sys
@@ -22,7 +10,6 @@ from app.config import ELEVENLABS_API_KEY
 
 ELEVENLABS_API_BASE = "https://api.elevenlabs.io"
 
-# ── Receptionist System Prompt ───────────────────────────────
 RECEPTIONIST_PROMPT = """
 You are a professional clinic receptionist answering the phone.
 You work at a medical/dental office and handle appointment confirmations and scheduling inquiries.
@@ -47,9 +34,7 @@ You work at a medical/dental office and handle appointment confirmations and sch
 - End the conversation after confirming the appointment details
 """
 
-RECEPTIONIST_FIRST_MESSAGE = (
-    "Hello, thank you for calling! How may I help you today?"
-)
+RECEPTIONIST_FIRST_MESSAGE = "Hello, thank you for calling! How may I help you today?"
 
 
 def _api_headers() -> dict:
@@ -60,23 +45,22 @@ def _api_headers() -> dict:
 
 
 def _build_receptionist_payload(name: str = "CallPilot Receptionist") -> dict:
-    """Build the agent creation payload for the receptionist."""
     return {
         "name": name,
         "conversation_config": {
             "agent": {
                 "prompt": {
                     "prompt": RECEPTIONIST_PROMPT,
-                    "llm": "gpt-4o-mini",  # Fast + cheap for receptionist
+                    "llm": "gpt-4o-mini",
                     "temperature": 0.6,
-                    "tools": [],  # No tools needed for receptionist
+                    "tools": [],
                 },
                 "first_message": RECEPTIONIST_FIRST_MESSAGE,
                 "language": "en",
             },
             "tts": {
                 "model_id": "eleven_flash_v2",
-                "voice_id": "EXAVITQu4vr4xnSDxMaL",  # Sarah — soft female voice
+                "voice_id": "EXAVITQu4vr4xnSDxMaL",
                 "optimize_streaming_latency": 3,
             },
         },
@@ -84,14 +68,9 @@ def _build_receptionist_payload(name: str = "CallPilot Receptionist") -> dict:
 
 
 def create_receptionist() -> str:
-    """Create a new receptionist agent on ElevenLabs."""
-    print("\n" + "=" * 55)
-    print("  🛫 CallPilot — Receptionist Agent Setup")
-    print("=" * 55 + "\n")
-
     payload = _build_receptionist_payload()
 
-    print("📡 Creating receptionist agent on ElevenLabs...")
+    print("Creating receptionist agent on ElevenLabs...")
     response = httpx.post(
         f"{ELEVENLABS_API_BASE}/v1/convai/agents/create",
         headers=_api_headers(),
@@ -100,26 +79,22 @@ def create_receptionist() -> str:
     )
 
     if response.status_code not in (200, 201):
-        print(f"❌ API Error ({response.status_code}): {response.text}")
+        print(f"API Error ({response.status_code}): {response.text}")
         sys.exit(1)
 
     data = response.json()
     agent_id = data.get("agent_id", "")
 
-    print(f"✅ Receptionist agent created!")
+    print(f"Receptionist agent created!")
     print(f"   Agent ID: {agent_id}")
-    print()
-    print("📋 Add this to your .env file:")
-    print(f"   ELEVENLABS_RECEPTIONIST_AGENT_ID={agent_id}")
-    print()
-    print("=" * 55 + "\n")
+    print(f"\nAdd this to your .env file:")
+    print(f"   ELEVENLABS_RECEPTIONIST_AGENT_ID={agent_id}\n")
 
     return agent_id
 
 
 def update_receptionist(agent_id: str) -> None:
-    """Update an existing receptionist agent."""
-    print(f"\n🔄 Updating receptionist agent {agent_id}...")
+    print(f"Updating receptionist agent {agent_id}...")
 
     payload = _build_receptionist_payload()
 
@@ -131,28 +106,20 @@ def update_receptionist(agent_id: str) -> None:
     )
 
     if response.status_code not in (200, 201):
-        print(f"❌ API Error ({response.status_code}): {response.text}")
+        print(f"API Error ({response.status_code}): {response.text}")
         sys.exit(1)
 
-    print(f"✅ Receptionist agent {agent_id} updated!")
+    print(f"Receptionist agent {agent_id} updated!")
 
 
 def main():
     parser = argparse.ArgumentParser(description="CallPilot Receptionist Agent Setup")
-    parser.add_argument(
-        "action",
-        choices=["create", "update"],
-        help="'create' a new receptionist agent or 'update' an existing one",
-    )
-    parser.add_argument(
-        "--agent-id",
-        default=None,
-        help="Agent ID to update (required for 'update')",
-    )
+    parser.add_argument("action", choices=["create", "update"])
+    parser.add_argument("--agent-id", default=None)
     args = parser.parse_args()
 
     if not ELEVENLABS_API_KEY:
-        print("❌ ELEVENLABS_API_KEY not set in .env")
+        print("ELEVENLABS_API_KEY not set in .env")
         sys.exit(1)
 
     if args.action == "create":
@@ -160,11 +127,10 @@ def main():
     elif args.action == "update":
         agent_id = args.agent_id
         if not agent_id:
-            # Try to read from env
             from app.config import ELEVENLABS_RECEPTIONIST_AGENT_ID
             agent_id = ELEVENLABS_RECEPTIONIST_AGENT_ID
         if not agent_id:
-            print("❌ No agent_id provided. Use --agent-id or set ELEVENLABS_RECEPTIONIST_AGENT_ID in .env")
+            print("No agent_id provided. Use --agent-id or set ELEVENLABS_RECEPTIONIST_AGENT_ID in .env")
             sys.exit(1)
         update_receptionist(agent_id)
 

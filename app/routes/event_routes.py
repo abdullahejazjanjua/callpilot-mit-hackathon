@@ -1,15 +1,3 @@
-"""
-CallPilot — Event Stream Routes (SSE)
-=======================================
-Server-Sent Events endpoint for real-time frontend updates.
-
-The frontend StatusTerminal connects to /events/stream and receives
-live log entries as they happen in the backend.
-
-ENDPOINT:
-  GET /events/stream → SSE stream of log events
-"""
-
 import asyncio
 import logging
 
@@ -25,16 +13,6 @@ router = APIRouter(prefix="/events", tags=["Events (SSE)"])
 
 @router.get("/stream")
 async def event_stream(request: Request):
-    """
-    SSE endpoint — streams real-time log events to the frontend.
-
-    Connect with EventSource:
-        const es = new EventSource('http://localhost:8000/events/stream');
-        es.onmessage = (e) => console.log(JSON.parse(e.data));
-
-    Each event is JSON:
-        { "timestamp": "14:32:01", "type": "info", "message": "...", "source": "swarm" }
-    """
     q = event_manager.subscribe()
 
     async def generate():

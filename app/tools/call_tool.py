@@ -1,26 +1,3 @@
-"""
-CallPilot — Simulated Call Tool
-=================================
-This tool SIMULATES outbound phone calls to service providers.
-No Twilio dependency — calls are simulated in-memory with realistic
-status progression, transcripts, and the same API contract.
-
-WHAT IT DOES:
-  1. call_to_inquire()  → Simulates calling a provider to ASK for available slots
-  2. initiate_call()    → Simulates calling a provider to CONFIRM a booked appointment
-  3. get_call_status()  → Checks the status of a simulated call
-
-HOW THE SIMULATED "CALL-FIRST" FLOW WORKS:
-  1. Agent finds providers (names, phones, ratings)
-  2. Agent calls a provider via call_to_inquire()
-  3. We simulate the call lifecycle (initiated → ringing → answered → completed)
-  4. We look up the provider's actual schedule and return the slots
-  5. A realistic transcript is generated showing the AI–provider conversation
-  6. Agent presents slots to the user, user picks one
-  7. Agent books the appointment on Google Calendar
-  8. Optionally, agent calls again via initiate_call() to confirm
-"""
-
 import logging
 import random
 import time
@@ -30,29 +7,21 @@ from typing import Optional
 
 logger = logging.getLogger("callpilot.calls")
 
-# ── Active calls tracking ────────────────────────────────
-ACTIVE_CALLS: dict = {}  # call_sid → call details
+ACTIVE_CALLS: dict = {}
 
 
 def _generate_call_sid() -> str:
-    """Generate a realistic simulated call SID."""
     return f"SIM_{uuid.uuid4().hex[:12]}"
 
 
 def _generate_simulated_slots(date: str, count: int = 4) -> list[str]:
-    """
-    Generate realistic simulated appointment slots for a given date.
-
-    Used when a provider (e.g. from Mapbox) has no slot data in providers.json.
-    Returns ISO-8601 datetime strings for business-hours slots.
-    """
+    """Generate realistic simulated appointment slots for a given date."""
     try:
         base = datetime.strptime(date, "%Y-%m-%d")
     except (ValueError, TypeError):
         base = datetime.now() + timedelta(days=1)
         base = base.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    # Possible appointment times during business hours (9 AM - 5 PM)
     possible_hours = [9, 10, 11, 12, 13, 14, 15, 16]
     possible_minutes = [0, 30]
 
@@ -61,7 +30,6 @@ def _generate_simulated_slots(date: str, count: int = 4) -> list[str]:
         for m in possible_minutes:
             all_times.append((h, m))
 
-    # Pick a random subset
     selected = random.sample(all_times, min(count, len(all_times)))
     selected.sort()
 
@@ -74,16 +42,12 @@ def _generate_simulated_slots(date: str, count: int = 4) -> list[str]:
 
 
 def _simulate_call_lifecycle(call_sid: str) -> None:
-    """
-    Simulate a call going through its lifecycle stages.
-    Updates ACTIVE_CALLS status as it progresses.
-    """
     stages = ["initiated", "ringing", "in-progress", "completed"]
     for stage in stages:
         if call_sid in ACTIVE_CALLS:
             ACTIVE_CALLS[call_sid]["status"] = stage
-            logger.info(f"[SIM] Call {call_sid[:16]}... status → {stage}")
-        time.sleep(0.3)  # Brief delay between stages
+            logger.info(f"[SIM] Call {call_sid[:16]}... status -> {stage}")
+        time.sleep(0.3)
 
 
 def _build_inquiry_transcript(
@@ -93,7 +57,6 @@ def _build_inquiry_transcript(
     date: str,
     slot_times: list[str],
 ) -> list[dict]:
-    """Build a realistic simulated transcript for an inquiry call."""
     transcript = [
         {
             "role": "agent",
@@ -106,9 +69,7 @@ def _build_inquiry_transcript(
         },
         {
             "role": "provider",
-            "text": (
-                f"Hi, this is {provider_name}. Let me check our schedule for {date}."
-            ),
+            "text": f"Hi, this is {provider_name}. Let me check our schedule for {date}.",
         },
     ]
 
@@ -120,10 +81,7 @@ def _build_inquiry_transcript(
         })
         transcript.append({
             "role": "agent",
-            "text": (
-                f"That's great. I'll pass those options along to {patient_name}. "
-                f"Thank you for your time!"
-            ),
+            "text": f"That's great. I'll pass those options along to {patient_name}. Thank you for your time!",
         })
         transcript.append({
             "role": "provider",
@@ -148,7 +106,6 @@ def _build_confirmation_transcript(
     service_type: str,
     appointment_time: str,
 ) -> list[dict]:
-    """Build a realistic simulated transcript for a confirmation call."""
     return [
         {
             "role": "agent",
@@ -163,8 +120,7 @@ def _build_confirmation_transcript(
             "role": "provider",
             "text": (
                 f"Hi, this is {provider_name}. Let me verify that... "
-                f"Yes, I can confirm {patient_name} is booked for "
-                f"{appointment_time}."
+                f"Yes, I can confirm {patient_name} is booked for {appointment_time}."
             ),
         },
         {
@@ -178,10 +134,6 @@ def _build_confirmation_transcript(
     ]
 
 
-# ══════════════════════════════════════════════════════════
-#  CORE FUNCTION 1: CALL TO INQUIRE ABOUT SLOTS
-# ══════════════════════════════════════════════════════════
-
 def call_to_inquire(
     provider_phone: str,
     provider_name: str,
@@ -189,28 +141,9 @@ def call_to_inquire(
     service_type: str = "appointment",
     patient_name: str = "CallPilot User",
 ) -> dict:
-    """
-    Simulate calling a provider to ask about available appointment slots.
-
-    This is the KEY tool in the call-first flow:
-    1. Simulates a phone call to the provider
-    2. Looks up the provider's actual schedule
-    3. Returns available slots with a simulated transcript
-    4. The agent presents the slots to the user
-
-    Args:
-        provider_phone: Provider's phone number (E.164 format)
-        provider_name: Provider's business name
-        date: Date to check (YYYY-MM-DD format)
-        service_type: Type of service (e.g., 'dentist', 'doctor')
-        patient_name: Patient's name
-
-    Returns:
-        dict with: available_slots, call_sid, call_status, provider info
-    """
+    """Simulate calling a provider to ask about available appointment slots."""
     logger.info(f"[INQUIRE] Simulating call to {provider_name} ({provider_phone}) for slots on {date}")
 
-    # ── 1. Look up the provider's schedule ────────────────
     from app.tools.provider_tool import get_provider_slots
     raw_slots = get_provider_slots(
         provider_phone=provider_phone,
@@ -218,12 +151,10 @@ def call_to_inquire(
         provider_name=provider_name,
     )
 
-    # If no slots found (e.g. Mapbox provider not in JSON), generate simulated ones
     if not raw_slots:
         logger.info(f"[INQUIRE] No stored slots for {provider_name}. Generating simulated slots.")
         raw_slots = _generate_simulated_slots(date, count=4)
 
-    # Format slots for readability
     formatted_slots = []
     for slot in raw_slots:
         try:
@@ -236,7 +167,6 @@ def call_to_inquire(
         except (ValueError, TypeError):
             formatted_slots.append({"datetime": slot, "time": slot})
 
-    # ── 2. Simulate the phone call ────────────────────────
     call_result = _simulate_inquiry_call(
         provider_phone=provider_phone,
         provider_name=provider_name,
@@ -249,7 +179,6 @@ def call_to_inquire(
     call_sid = call_result.get("call_sid", "N/A")
     call_status = call_result.get("status", "unknown")
 
-    # ── 3. Build the response ─────────────────────────────
     if formatted_slots:
         slot_times = ", ".join(s["time"] for s in formatted_slots)
         message = (
@@ -289,12 +218,8 @@ def _simulate_inquiry_call(
     patient_name: str,
     slot_times: list[str],
 ) -> dict:
-    """
-    Simulate an inquiry call with lifecycle progression and transcript.
-    """
     call_sid = _generate_call_sid()
 
-    # Build simulated transcript
     transcript = _build_inquiry_transcript(
         provider_name=provider_name,
         patient_name=patient_name,
@@ -303,7 +228,6 @@ def _simulate_inquiry_call(
         slot_times=slot_times,
     )
 
-    # Track the call
     ACTIVE_CALLS[call_sid] = {
         "call_sid": call_sid,
         "status": "initiated",
@@ -320,17 +244,10 @@ def _simulate_inquiry_call(
     }
 
     logger.info(f"[SIM] Simulating inquiry call to {provider_name}...")
-
-    # Simulate call lifecycle
     _simulate_call_lifecycle(call_sid)
-
     logger.info(f"[SIM] Inquiry call completed: {call_sid}")
     return {"success": True, "call_sid": call_sid, "status": "completed"}
 
-
-# ══════════════════════════════════════════════════════════
-#  CORE FUNCTION 2: CALL TO CONFIRM A BOOKING
-# ══════════════════════════════════════════════════════════
 
 def initiate_call(
     provider_phone: str,
@@ -339,25 +256,9 @@ def initiate_call(
     service_type: str = "appointment",
     patient_name: str = "CallPilot User",
 ) -> dict:
-    """
-    Simulate an outbound phone call to CONFIRM a booked appointment.
-
-    This is used AFTER the user has booked. The simulated AI calls
-    the provider and confirms the appointment details.
-
-    Args:
-        provider_phone: Provider's phone number (E.164 format)
-        provider_name: Provider's business name
-        appointment_time: Appointment time (human readable or ISO-8601)
-        service_type: Type of service
-        patient_name: Patient's name
-
-    Returns:
-        dict with: success, call_sid, status, message
-    """
+    """Simulate an outbound phone call to confirm a booked appointment."""
     call_sid = _generate_call_sid()
 
-    # Build simulated transcript
     transcript = _build_confirmation_transcript(
         provider_name=provider_name,
         patient_name=patient_name,
@@ -365,7 +266,6 @@ def initiate_call(
         appointment_time=appointment_time,
     )
 
-    # Track the call
     ACTIVE_CALLS[call_sid] = {
         "call_sid": call_sid,
         "status": "initiated",
@@ -382,10 +282,7 @@ def initiate_call(
     }
 
     logger.info(f"[SIM] Simulating confirmation call to {provider_name}...")
-
-    # Simulate call lifecycle
     _simulate_call_lifecycle(call_sid)
-
     logger.info(f"[SIM] Confirmation call completed: {call_sid}")
 
     return {
@@ -402,12 +299,7 @@ def initiate_call(
     }
 
 
-# ══════════════════════════════════════════════════════════
-#  HELPER FUNCTIONS
-# ══════════════════════════════════════════════════════════
-
 def get_call_status(call_sid: str) -> dict:
-    """Get the current status of a call from in-memory tracking."""
     if call_sid in ACTIVE_CALLS:
         call = ACTIVE_CALLS[call_sid]
         return {
@@ -427,7 +319,6 @@ def get_call_status(call_sid: str) -> dict:
 
 
 def update_call_status(call_sid: str, status: str) -> None:
-    """Update the tracked status of a call."""
     if call_sid in ACTIVE_CALLS:
         ACTIVE_CALLS[call_sid]["status"] = status
         logger.info(f"[CALL] Call {call_sid[:16]}... status -> {status}")

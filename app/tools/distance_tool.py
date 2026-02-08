@@ -1,25 +1,3 @@
-"""
-CallPilot — Distance Tool (REAL Google Maps + Mock Fallback)
-==============================================================
-This tool calculates real travel distance and time using the
-Google Maps Distance Matrix API when an API key is available.
-
-REAL MODE (GOOGLE_MAPS_API_KEY set):
-  • Calls Google Maps Distance Matrix API
-  • Returns actual driving distance (km) and travel time (minutes)
-
-MOCK MODE (no API key):
-  • Uses hash-based deterministic fake distances
-  • Consistent results for demos
-
-HOW TO ENABLE REAL MODE:
-  1. Go to https://console.cloud.google.com
-  2. Enable "Distance Matrix API"
-  3. Create an API key (APIs & Services → Credentials → Create → API Key)
-  4. Add to .env: GOOGLE_MAPS_API_KEY=your_key_here
-  5. Restart the server
-"""
-
 import hashlib
 import logging
 
@@ -34,27 +12,11 @@ DISTANCE_MATRIX_URL = "https://maps.googleapis.com/maps/api/distancematrix/json"
 
 
 def _is_real():
-    """Check if real Google Maps API is available."""
     return bool(GOOGLE_MAPS_API_KEY)
 
 
-# ══════════════════════════════════════════════════════════════
-#  REAL: Google Maps Distance Matrix API
-# ══════════════════════════════════════════════════════════════
-
 def _real_distance(origin: str, destination: str) -> tuple[float, int]:
-    """
-    Get real distance and travel time from Google Maps Distance Matrix API.
-
-    API docs: https://developers.google.com/maps/documentation/distance-matrix
-
-    Args:
-        origin: Starting address
-        destination: Ending address
-
-    Returns:
-        Tuple of (distance_km, duration_minutes)
-    """
+    """Get real distance and travel time from Google Maps Distance Matrix API."""
     try:
         response = httpx.get(
             DISTANCE_MATRIX_URL,
@@ -80,12 +42,11 @@ def _real_distance(origin: str, destination: str) -> tuple[float, int]:
             logger.warning(f"[DISTANCE] Element status: {element.get('status')}")
             return _mock_distance(origin, destination)
 
-        # distance.value is in meters, duration.value is in seconds
         distance_km = round(element["distance"]["value"] / 1000, 1)
         duration_minutes = round(element["duration"]["value"] / 60)
 
         logger.info(
-            f"[DISTANCE] 🗺️ Real Google Maps: {origin[:30]}... → {destination[:30]}... = "
+            f"[DISTANCE] Real Google Maps: {origin[:30]}... -> {destination[:30]}... = "
             f"{distance_km} km, {duration_minutes} min"
         )
 
@@ -96,17 +57,8 @@ def _real_distance(origin: str, destination: str) -> tuple[float, int]:
         return _mock_distance(origin, destination)
 
 
-# ══════════════════════════════════════════════════════════════
-#  MOCK: Hash-based deterministic distances
-# ══════════════════════════════════════════════════════════════
-
 def _mock_distance(origin: str, destination: str) -> tuple[float, int]:
-    """
-    Generate a consistent mock distance between two addresses.
-
-    Uses MD5 hashing for deterministic results:
-    same inputs → same output (important for demos).
-    """
+    """Generate a consistent mock distance using hash-based determinism."""
     combined = f"{origin.lower().strip()}|{destination.lower().strip()}"
     hash_hex = hashlib.md5(combined.encode()).hexdigest()[:8]
     hash_int = int(hash_hex, 16)
@@ -117,30 +69,13 @@ def _mock_distance(origin: str, destination: str) -> tuple[float, int]:
     return distance_km, duration_minutes
 
 
-# ══════════════════════════════════════════════════════════════
-#  PUBLIC API (used by routes and swarm)
-# ══════════════════════════════════════════════════════════════
-
 def calculate_distance(
     user_location: str,
     provider_address: str,
     provider_id: str = "",
     provider_name: str = "",
 ) -> dict:
-    """
-    Calculate travel distance/time between user and a provider.
-
-    Automatically uses Google Maps API if available, falls back to mock.
-
-    Args:
-        user_location: User's current address or location
-        provider_address: Provider's address
-        provider_id: Provider's unique ID (for reference)
-        provider_name: Provider's name (for reference)
-
-    Returns:
-        dict with: provider_id, provider_name, distance_km, duration_minutes, source
-    """
+    """Calculate travel distance/time between user and a provider."""
     if _is_real():
         distance_km, duration_minutes = _real_distance(user_location, provider_address)
         source = "google_maps"
@@ -161,18 +96,7 @@ def calculate_distance(
 
 
 def rank_by_distance(user_location: str, providers: list[dict]) -> dict:
-    """
-    Rank a list of providers by their distance from the user.
-
-    Uses real Google Maps distances when available.
-
-    Args:
-        user_location: User's address
-        providers: List of provider dicts (must have 'address', 'id', 'name')
-
-    Returns:
-        dict with: user_location, ranked_providers (sorted by distance), source
-    """
+    """Rank a list of providers by their distance from the user."""
     ranked = []
 
     for provider in providers:

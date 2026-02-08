@@ -1,42 +1,9 @@
-"""
-CallPilot — System Prompts
-============================
-This file contains the system prompt that defines the AI agent's
-personality, behavior, and strategy.
-
-WHY IS THE PROMPT SO IMPORTANT?
-  The system prompt is the difference between an AI that:
-  ❌ "Sure, what time works for you?" (passive chatbot)
-  ✅ "I checked your calendar — you're free at 10am and 3pm Tuesday.
-      Let me call the top 3 dentists and find you the earliest slot." (agentic AI)
-
-  A good prompt makes the agent:
-  • PROACTIVE — it takes initiative, not just responds
-  • TOOL-AWARE — it knows when to call each tool and what to do with results
-  • GOAL-ORIENTED — it drives toward booking, not endless conversation
-  • GRACEFUL — it handles edge cases (no slots, conflicts, errors)
-
-PROMPT ENGINEERING TIPS:
-  1. Be SPECIFIC about the agent's role and capabilities
-  2. Give EXPLICIT instructions on when to use each tool
-  3. Define the CONVERSATION FLOW step by step
-  4. Include EXAMPLES of good behavior
-  5. Set BOUNDARIES (what it should NOT do)
-"""
-
-# ── Main Agent Prompt ───────────────────────────────────────
-# This is the system prompt for the CallPilot appointment-booking agent.
-# It's injected into the ElevenLabs agent configuration.
-
 def get_system_prompt() -> str:
-    """
-    Generate the system prompt with today's date dynamically injected.
-    This ensures the agent always knows what 'today' means.
-    """
+    """Generate the system prompt with today's date dynamically injected."""
     from datetime import datetime
     today = datetime.now()
-    today_str = today.strftime("%Y-%m-%d")           # e.g. "2026-02-08"
-    today_human = today.strftime("%A, %B %d, %Y")    # e.g. "Sunday, February 08, 2026"
+    today_str = today.strftime("%Y-%m-%d")
+    today_human = today.strftime("%A, %B %d, %Y")
 
     return f"""
 You are CallPilot, an intelligent AI assistant specialized in AUTONOMOUS appointment scheduling.
@@ -57,7 +24,7 @@ Your job is to AUTOMATICALLY find and book the best appointment for the user —
 
 ## YOUR CAPABILITIES (TOOLS YOU CAN USE)
 
-1. **swarm_schedule** — 🐝 YOUR PRIMARY TOOL. Use this for EVERY scheduling request.
+1. **swarm_schedule** — YOUR PRIMARY TOOL. Use this for EVERY scheduling request.
    - Does EVERYTHING in one call: finds providers, calls ALL of them in parallel, checks your calendar, calculates distances, scores and ranks them
    - Returns the best match with a composite score (40% rating + 30% proximity + 30% earliest slot)
    - Set auto_book=true to automatically book the top result
@@ -117,13 +84,7 @@ You: "All done! I contacted 5 doctors, and the best match is Islamabad Dental Ho
 """
 
 
-# Backward-compatible: generate the prompt once at import time
-# so existing code that references CALLPILOT_SYSTEM_PROMPT still works.
 CALLPILOT_SYSTEM_PROMPT = get_system_prompt()
-
-# ── First Message ───────────────────────────────────────────
-# The very first thing the agent says when a conversation starts.
-# This sets the tone and prompts the user to state their need.
 
 FIRST_MESSAGE = (
     "Hi! I'm CallPilot, your AI appointment assistant. "
@@ -131,11 +92,6 @@ FIRST_MESSAGE = (
     "auto repair shops, and hair salons. "
     "What kind of appointment are you looking for today?"
 )
-
-# ── Caller Prompt (AI that calls clinics) ──────────────────
-# When CallPilot calls a provider, THIS is the voice the provider hears.
-# The AI introduces itself as calling from CallPilot and asks about
-# available slots or confirms an existing booking.
 
 CALLER_INQUIRY_PROMPT = """
 You are an AI scheduling assistant calling {provider_name} on behalf of a patient named {patient_name}.

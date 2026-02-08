@@ -1,0 +1,67 @@
+================================================================================
+                        CALLPILOT — 1-PAGE REPORT
+              Autonomous Voice AI for Appointment Scheduling
+================================================================================
+
+PROBLEM
+--------------------------------------------------------------------------------
+Scheduling appointments is a manual, time-consuming process. Users must search
+for providers, call them individually, wait on hold, compare availability against
+their own calendar, and repeat until something works. A single booking can take
+20+ minutes and multiple phone calls.
+
+SOLUTION
+--------------------------------------------------------------------------------
+CallPilot is a voice-first AI agent that autonomously handles the entire
+appointment scheduling workflow through a single natural language command.
+Instead of asking the user to choose — CallPilot decides, acts, and books.
+
+HOW IT WORKS
+--------------------------------------------------------------------------------
+1. USER SPEAKS    → "I need a dentist tomorrow near Lahore"
+2. SWARM MODE     → Agent simultaneously contacts up to 15 providers in parallel
+3. CALENDAR CHECK → Cross-references user's Google Calendar for conflicts
+4. DISTANCE CALC  → Computes travel time from user to each provider
+5. SCORING        → Ranks providers: 40% rating + 30% proximity + 30% earliness
+6. AUTO-BOOK      → Books the #1 match and confirms on Google Calendar
+
+TECHNICAL ARCHITECTURE
+--------------------------------------------------------------------------------
+• Voice Interface    — ElevenLabs Conversational AI (real-time WebSocket)
+• Backend            — FastAPI (Python) with webhook tool endpoints
+• Swarm Orchestrator — ThreadPoolExecutor for parallel provider outreach
+• Calendar           — Google Calendar API (real events, real availability)
+• Provider Search    — Mapbox Search Box API with JSON fallback
+• Distance           — Google Maps Distance Matrix API (mock fallback)
+• Phone Simulation   — Simulated call lifecycle with generated transcripts
+• Frontend           — React + TypeScript + Tailwind CSS + shadcn/ui
+• Real-Time Updates  — Server-Sent Events (SSE) streaming to live terminal
+• Tunnel             — Cloudflare Tunnel for public webhook access
+
+KEY FEATURES
+--------------------------------------------------------------------------------
+• Swarm Mode       — Calls ALL providers at once, not one at a time
+• Composite Scoring — Multi-factor ranking algorithm (rating, distance, time)
+• Auto-Booking     — No user decision needed; AI picks the best option
+• Live Terminal    — Frontend shows real-time backend activity as it happens
+• Voice-First     — Entire interaction via natural speech, no forms or clicks
+• Calendar-Aware  — Never double-books; checks real Google Calendar
+
+TECH STACK
+--------------------------------------------------------------------------------
+  Backend:   Python, FastAPI, ElevenLabs SDK, Google APIs, Mapbox, Pydantic
+  Frontend:  React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui, @elevenlabs/react
+  Infra:     Uvicorn, Cloudflare Tunnel, Server-Sent Events
+
+IMPACT
+--------------------------------------------------------------------------------
+• 20-minute manual process → 30-second voice command
+• 1 provider at a time    → 15 providers called simultaneously
+• User picks from a list  → AI scores, ranks, and auto-books the best match
+• Passive chatbot          → Fully autonomous scheduling agent
+
+TEAM
+--------------------------------------------------------------------------------
+Built for ElevenLabs Hackathon 2026
+
+================================================================================
