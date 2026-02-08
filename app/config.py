@@ -48,8 +48,12 @@ TWILIO_PHONE_NUMBER: str = os.getenv("TWILIO_PHONE_NUMBER", "")
 # Which calendar to check — "primary" = user's main calendar.
 GOOGLE_CALENDAR_ID: str = os.getenv("GOOGLE_CALENDAR_ID", "primary")
 
-# API key for Google Maps / Places (non-OAuth, simpler auth).
+# API key for Google Maps (Distance Matrix). Enable in Cloud Console.
 GOOGLE_MAPS_API_KEY: str = os.getenv("GOOGLE_MAPS_API_KEY", "")
+
+# Mapbox access token for Search Box API (provider search).
+# Get from https://account.mapbox.com/access-tokens/
+MAPBOX_ACCESS_TOKEN: str = os.getenv("MAPBOX_ACCESS_TOKEN", "")
 
 # ── App Settings ────────────────────────────────────────────
 # Server host/port (useful for deployment flexibility).

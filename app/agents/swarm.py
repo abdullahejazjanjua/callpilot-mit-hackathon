@@ -203,6 +203,8 @@ def run_swarm(
         category=category,
         date=date,
         min_rating=min_rating,
+        location=user_location,
+        limit=10,
     )
 
     providers = provider_result.get("providers", [])

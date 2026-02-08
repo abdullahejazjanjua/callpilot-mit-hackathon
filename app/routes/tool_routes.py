@@ -83,6 +83,8 @@ router = APIRouter(
 class FindProvidersRequest(BaseModel):
     """Body for /tools/find-providers"""
     category: str = Field(description="Service category (e.g., 'dentists')")
+    location: Optional[str] = Field(default=None, description="City or address for Places search")
+    limit: Optional[int] = Field(default=5, description="Max number of providers to return")
 
 
 class FindAvailableRequest(BaseModel):
@@ -90,6 +92,8 @@ class FindAvailableRequest(BaseModel):
     category: str = Field(description="Service category")
     date: Optional[str] = Field(default=None, description="Date filter (YYYY-MM-DD)")
     min_rating: Optional[float] = Field(default=0.0, description="Minimum rating (1.0-5.0)")
+    location: Optional[str] = Field(default=None, description="City or address for Places search")
+    limit: Optional[int] = Field(default=5, description="Max number of providers to return")
 
 
 class ProviderDetailsRequest(BaseModel):
@@ -159,11 +163,18 @@ async def tool_find_providers(request: FindProvidersRequest):
     Find service providers by category.
 
     ElevenLabs calls this when the user mentions a service type.
-    Example: User says "I need a dentist" → Agent calls this with category="dentists"
+    Pass location for real Places API results; otherwise uses JSON fallback.
     """
-    logger.info(f"[TOOL CALL] find_providers(category='{request.category}')")
+    logger.info(
+        f"[TOOL CALL] find_providers(category='{request.category}', "
+        f"location='{request.location}', limit={request.limit})"
+    )
 
-    result = find_providers(request.category)
+    result = find_providers(
+        category=request.category,
+        location=request.location,
+        limit=request.limit or 5,
+    )
 
     logger.info(f"[TOOL RESULT] Found {result['count']} providers in '{request.category}'")
     return result
@@ -181,13 +192,16 @@ async def tool_find_available(request: FindAvailableRequest):
         f"[TOOL CALL] find_available_providers("
         f"category='{request.category}', "
         f"date='{request.date}', "
-        f"min_rating={request.min_rating})"
+        f"min_rating={request.min_rating}, "
+        f"location='{request.location}', limit={request.limit})"
     )
 
     result = find_available_providers(
         category=request.category,
         date=request.date,
         min_rating=request.min_rating or 0.0,
+        location=request.location,
+        limit=request.limit or 5,
     )
 
     logger.info(f"[TOOL RESULT] Found {result['count']} available providers")

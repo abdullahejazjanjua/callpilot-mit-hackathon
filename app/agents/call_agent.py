@@ -148,7 +148,8 @@ def build_tool_definitions(server_url: str) -> list[dict]:
             description=(
                 "Search for service providers by category. "
                 "Categories: 'dentists', 'doctors', 'auto_repair', 'hair_salon'. "
-                "Also accepts variations like 'dentist', 'doctor', 'mechanic', 'barber', 'salon'. "
+                "Pass location (e.g. city or address) for real Google Places results; "
+                "otherwise uses fallback data. "
                 "Returns provider names, ratings, phone numbers, and addresses. "
                 "Does NOT return available slots — you must use call_to_inquire to CALL them and get slots."
             ),
@@ -158,6 +159,14 @@ def build_tool_definitions(server_url: str) -> list[dict]:
                 "category": {
                     "type": "string",
                     "description": "Service category (e.g., 'dentists', 'doctors', 'auto_repair', 'hair_salon')",
+                },
+                "location": {
+                    "type": "string",
+                    "description": "City or address for Places search (e.g. 'San Francisco', 'Lahore')",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max number of providers to return (default 5)",
                 },
             },
             required=["category"],

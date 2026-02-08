@@ -9,39 +9,99 @@ WHAT IT DOES:
   3. find_available_providers(...) → Filter by date + minimum rating
 
 DATA SOURCE:
-  Currently reads from app/data/providers.json (our mock directory).
-  In production, this would call Google Places API to find real
-  businesses with ratings, hours, and phone numbers.
-
-HOW THE AI USES THIS:
-  User says: "I need a dentist appointment this week"
-  → Agent calls: find_providers("dentists")
-  → Gets back 3 dentists with ratings + available slots
-  → Agent picks the best match or asks user for preference
-  → Then calls each provider's number via Twilio
-
-KEY DESIGN DECISION — WHY JSON, NOT A DATABASE?
-  For a hackathon, a JSON file is:
-  • Zero setup (no Postgres, no migrations)
-  • Easy to edit and demo (open file, change data, restart)
-  • Sufficient for 10-20 providers
-  In production, you'd use a database + Google Places API.
+  PRIMARY: Mapbox Search Box API when MAPBOX_ACCESS_TOKEN and location are set.
+  FALLBACK: app/data/providers.json when API unavailable or no location.
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 
+import httpx
+
+from app.config import MAPBOX_ACCESS_TOKEN
 from app.models.schemas import Provider
 
+logger = logging.getLogger("callpilot.provider")
 
-# ── Load Provider Data ──────────────────────────────────────
-# Path.resolve() gives absolute path, so this works regardless
-# of where you run the server from.
-#
-# We load ONCE at import time (not on every call) for speed.
-
+# ── Constants ────────────────────────────────────────────────
 DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "providers.json"
+MAPBOX_FORWARD_URL = "https://api.mapbox.com/search/searchbox/v1/forward"
+
+# Category → query string (singular form for search)
+CATEGORY_TO_QUERY = {
+    "dentists": "dentist",
+    "doctors": "doctor",
+    "auto_repair": "auto repair",
+    "hair_salon": "hair salon",
+}
+
+
+def _mapbox_forward_search(category: str, location: str, limit: int) -> list | None:
+    """
+    Call Mapbox Search Box API /forward Text Search.
+
+    Returns list of GeoJSON features, or None on error/empty.
+    """
+    query_term = CATEGORY_TO_QUERY.get(category, category)
+    query = f"{query_term} in {location}"
+    cap_limit = min(limit, 10)  # Mapbox max is 10
+
+    try:
+        response = httpx.get(
+            MAPBOX_FORWARD_URL,
+            params={
+                "q": query,
+                "access_token": MAPBOX_ACCESS_TOKEN,
+                "limit": cap_limit,
+            },
+            timeout=10.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        features = data.get("features", [])
+        if not features:
+            logger.info("[MAPBOX] No results for query: %s", query)
+            return None
+
+        logger.info("[MAPBOX] Found %d results for: %s", len(features), query)
+        return features
+
+    except Exception as e:
+        logger.warning("[MAPBOX] Forward search error: %s. Falling back to JSON.", e)
+        return None
+
+
+def _mapbox_to_providers(features: list, limit: int) -> list[dict]:
+    """
+    Map Mapbox GeoJSON features to Provider schema.
+
+    Mapbox does not return phone or rating; set to empty string and 0.
+    """
+    providers = []
+    for feature in features[:limit]:
+        props = feature.get("properties", {})
+        mapbox_id = props.get("mapbox_id", "")
+        name = props.get("name", "")
+        full_address = props.get("full_address", "")
+        if not full_address:
+            addr = props.get("address", "")
+            place = props.get("place_formatted", "")
+            full_address = f"{addr}, {place}".strip(", ") if addr or place else ""
+
+        provider = {
+            "id": mapbox_id,
+            "name": name,
+            "phone": "+923107696477",
+            "address": full_address,
+            "rating": 0.0,
+            "available_slots": [],
+        }
+        providers.append(provider)
+
+    return providers
 
 
 def _load_providers() -> dict:
@@ -58,32 +118,9 @@ def _load_providers() -> dict:
         return json.load(f)
 
 
-def find_providers(category: str) -> dict:
-    """
-    Find all service providers in a given category.
-
-    This is the first tool the agent calls when the user requests
-    an appointment. It returns ALL providers in that category
-    so the agent can decide which ones to call.
-
-    Args:
-        category: Type of service. Must be one of:
-                  'dentists', 'doctors', 'auto_repair', 'hair_salon'
-
-    Returns:
-        dict with: category, providers (list), count
-        If category not found, returns empty list + available categories.
-
-    Example:
-        find_providers("dentists")
-        → {"category": "dentists", "count": 3, "providers": [...]}
-    """
-    data = _load_providers()
-
-    # Normalize input: "Dentist" → "dentists", "doctor" → "doctors"
+def _find_providers_from_json(category: str, data: dict, strip_slots: bool = True) -> dict:
+    """Fallback: load providers from JSON. Resolves category and returns result dict."""
     category_lower = category.lower().strip()
-
-    # Map common variations to our JSON keys
     category_map = {
         "dentist": "dentists",
         "dentists": "dentists",
@@ -103,7 +140,6 @@ def find_providers(category: str) -> dict:
         "salon": "hair_salon",
         "barber": "hair_salon",
     }
-
     resolved_category = category_map.get(category_lower)
 
     if resolved_category is None or resolved_category not in data:
@@ -116,18 +152,77 @@ def find_providers(category: str) -> dict:
         }
 
     providers = [Provider(**p).model_dump() for p in data[resolved_category]]
-
-    # ── Strip available_slots from the response ──────────────
-    # The agent must CALL the provider to discover slots.
-    # This prevents the agent from reading hardcoded schedules.
-    for p in providers:
-        p.pop("available_slots", None)
+    if strip_slots:
+        for p in providers:
+            p.pop("available_slots", None)
 
     return {
         "category": resolved_category,
         "providers": providers,
         "count": len(providers),
+        "source": "json",
     }
+
+
+def find_providers(
+    category: str,
+    location: Optional[str] = None,
+    limit: int = 5,
+    include_slots: bool = False,
+) -> dict:
+    """
+    Find service providers in a category.
+
+    PRIMARY: Mapbox Search Box API when MAPBOX_ACCESS_TOKEN and location are set.
+    FALLBACK: providers.json when API unavailable or no location.
+
+    Args:
+        category: 'dentists', 'doctors', 'auto_repair', 'hair_salon'
+        location: City or address for Mapbox search (e.g. "San Francisco", "Lahore")
+        limit: Max number of providers to return (default 5)
+
+    Returns:
+        dict with category, providers (list), count, source ('mapbox' or 'json')
+    """
+    data = _load_providers()
+    category_map = {
+        "dentist": "dentists",
+        "dentists": "dentists",
+        "dental": "dentists",
+        "doctor": "doctors",
+        "doctors": "doctors",
+        "physician": "doctors",
+        "medical": "doctors",
+        "auto": "auto_repair",
+        "auto_repair": "auto_repair",
+        "car": "auto_repair",
+        "car_repair": "auto_repair",
+        "mechanic": "auto_repair",
+        "hair": "hair_salon",
+        "hair_salon": "hair_salon",
+        "haircut": "hair_salon",
+        "salon": "hair_salon",
+        "barber": "hair_salon",
+    }
+    resolved = category_map.get(category.lower().strip(), "dentists")
+
+    # Try Mapbox Search Box API first when token and location available
+    if MAPBOX_ACCESS_TOKEN and location and location.strip():
+        features = _mapbox_forward_search(resolved, location.strip(), limit)
+        if features:
+            providers = _mapbox_to_providers(features, limit)
+            for p in providers:
+                p.pop("available_slots", None)
+            return {
+                "category": resolved,
+                "providers": providers,
+                "count": len(providers),
+                "source": "mapbox",
+            }
+        logger.info("[MAPBOX] No results or error; falling back to JSON.")
+
+    # Fallback to JSON
+    return _find_providers_from_json(category, data, strip_slots=not include_slots)
 
 
 def get_provider_by_id(provider_id: str) -> dict:
@@ -224,54 +319,57 @@ def find_available_providers(
     category: str,
     date: Optional[str] = None,
     min_rating: float = 0.0,
+    location: Optional[str] = None,
+    limit: int = 5,
 ) -> dict:
     """
     Find providers filtered by availability date and minimum rating.
 
-    This is the SMART search — it combines category + date + quality.
-    The agent uses this when the user says something like:
-      "Find me a highly-rated dentist available tomorrow"
+    For Mapbox results: available_slots is always empty; date filter
+    does not apply (agent must use call_to_inquire). Filter by rating only.
+    For JSON results: filter by both date and rating.
 
     Args:
         category: Service type (e.g., 'dentists')
-        date: Filter to slots on this date (YYYY-MM-DD format).
-              If None, returns all available slots.
-        min_rating: Minimum Google rating (e.g., 4.5)
-
-    Returns:
-        dict with filtered providers, including only matching slots.
-
-    Example:
-        find_available_providers("dentists", date="2026-02-10", min_rating=4.5)
-        → Only dentists rated ≥4.5 with slots on Feb 10th
+        date: Filter to slots on this date (YYYY-MM-DD). Only applies to JSON.
+        min_rating: Minimum rating (e.g., 4.5)
+        location: City/address for Mapbox search (passed to find_providers)
+        limit: Max providers (passed to find_providers)
     """
-    result = find_providers(category)
+    result = find_providers(
+        category=category,
+        location=location,
+        limit=limit,
+        include_slots=True,
+    )
 
     if result["count"] == 0:
         return result
 
     filtered = []
+    from_mapbox = result.get("source") == "mapbox"
 
     for provider_dict in result["providers"]:
         # Filter by rating
-        if provider_dict["rating"] < min_rating:
+        if provider_dict.get("rating", 0) < min_rating:
             continue
 
-        # Filter slots by date (if specified)
-        if date:
-            matching_slots = [
-                s for s in provider_dict["available_slots"]
-                if s.startswith(date)  # "2026-02-10T14:00:00".startswith("2026-02-10")
-            ]
+        # For Mapbox: no slots; include all. For JSON: filter by date if specified.
+        if not from_mapbox and date:
+            slots = provider_dict.get("available_slots", [])
+            matching_slots = [s for s in slots if str(s).startswith(date)]
             if not matching_slots:
                 continue
-            # Only show slots on the requested date
             provider_dict = {**provider_dict, "available_slots": matching_slots}
 
         filtered.append(provider_dict)
 
     # Sort by rating (highest first)
-    filtered.sort(key=lambda p: p["rating"], reverse=True)
+    filtered.sort(key=lambda p: p.get("rating", 0), reverse=True)
+
+    # Strip available_slots before returning — agent must use call_to_inquire
+    for p in filtered:
+        p.pop("available_slots", None)
 
     return {
         "category": result["category"],
@@ -281,4 +379,5 @@ def find_available_providers(
             "date": date,
             "min_rating": min_rating,
         },
+        "source": result.get("source", "json"),
     }
