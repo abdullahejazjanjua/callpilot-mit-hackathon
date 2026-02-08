@@ -217,6 +217,50 @@ async def agent_info():
         raise HTTPException(status_code=500, detail=f"Failed to get agent info: {str(e)}")
 
 
+@router.get("/signed-url")
+async def get_signed_url():
+    """
+    Generate a signed URL for the ElevenLabs Conversational AI widget.
+
+    The frontend calls this before starting a voice session.
+    The signed URL connects directly to ElevenLabs' WebSocket,
+    keeping the API key safely on the backend.
+    """
+    if not ELEVENLABS_API_KEY:
+        raise HTTPException(
+            status_code=400,
+            detail="ELEVENLABS_API_KEY not set in .env",
+        )
+
+    agent_id = ELEVENLABS_AGENT_ID
+    if not agent_id:
+        raise HTTPException(
+            status_code=400,
+            detail="ELEVENLABS_AGENT_ID not set in .env. Create an agent first via POST /agent/create",
+        )
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id={agent_id}",
+                headers={"xi-api-key": ELEVENLABS_API_KEY},
+                timeout=10,
+            )
+            response.raise_for_status()
+            data = response.json()
+            return {"signed_url": data.get("signed_url", "")}
+
+    except httpx.HTTPStatusError as e:
+        logger.error(f"[AGENT] Failed to get signed URL: {e.response.status_code}")
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=f"ElevenLabs API error: {e.response.text}",
+        )
+    except Exception as e:
+        logger.error(f"[AGENT] Failed to get signed URL: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/ngrok-url")
 async def detect_ngrok_url():
     """

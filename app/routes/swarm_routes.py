@@ -163,6 +163,7 @@ async def swarm_schedule_webhook(request: SwarmWebhookRequest):
         return {
             "success": False,
             "message": result.get("message", "No providers found"),
+            "calls_made": result.get("calls_made", 0),
             "options_count": 0,
         }
 
@@ -185,6 +186,7 @@ async def swarm_schedule_webhook(request: SwarmWebhookRequest):
 
     response = {
         "success": True,
+        "calls_made": result.get("calls_made", 0),
         "options_count": len(ranked),
         "voice_summary": voice_summary,
         "recommendation": {

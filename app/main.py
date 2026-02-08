@@ -56,6 +56,7 @@ from app.routes.agent_routes import router as agent_router
 from app.routes.swarm_routes import router as swarm_router
 from app.routes.swarm_routes import webhook_router as swarm_webhook_router
 from app.routes.call_routes import router as call_router
+from app.routes.event_routes import router as event_router
 
 # ── Logging Configuration ───────────────────────────────────
 # Set up logging so we can see tool calls in the terminal.
@@ -102,6 +103,7 @@ app.include_router(agent_router)
 app.include_router(swarm_router)
 app.include_router(swarm_webhook_router)  # /tools/swarm-schedule webhook
 app.include_router(call_router)             # /call/* phone call routes
+app.include_router(event_router)            # /events/* SSE stream
 
 
 # ── Core Endpoints ──────────────────────────────────────────
@@ -166,6 +168,8 @@ async def startup_event():
     print("  🤖 Agent Mgmt:  http://localhost:8000/agent/...")
     print("  🐝 Swarm Mode:  http://localhost:8000/swarm/...")
     print("  📞 Phone Calls: http://localhost:8000/call/...")
+    print("  📡 Events SSE:  http://localhost:8000/events/stream")
+    print("  🖥️  Frontend:    http://localhost:8080")
     print("=" * 55)
 
     # Show integration status

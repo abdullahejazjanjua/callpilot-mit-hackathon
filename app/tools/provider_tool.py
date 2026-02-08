@@ -210,16 +210,24 @@ def find_providers(
     if MAPBOX_ACCESS_TOKEN and location and location.strip():
         features = _mapbox_forward_search(resolved, location.strip(), limit)
         if features:
-            providers = _mapbox_to_providers(features, limit)
-            for p in providers:
-                p.pop("available_slots", None)
-            return {
-                "category": resolved,
-                "providers": providers,
-                "count": len(providers),
-                "source": "mapbox",
-            }
-        logger.info("[MAPBOX] No results or error; falling back to JSON.")
+            # Filter to only features that look like real businesses (have a name that isn't just a city)
+            poi_features = [
+                f for f in features
+                if f.get("properties", {}).get("feature_type") == "poi"
+                or (f.get("properties", {}).get("name", "").lower() not in location.lower()
+                    and len(f.get("properties", {}).get("name", "")) > 2)
+            ]
+            if len(poi_features) >= 3:
+                providers = _mapbox_to_providers(poi_features, limit)
+                for p in providers:
+                    p.pop("available_slots", None)
+                return {
+                    "category": resolved,
+                    "providers": providers,
+                    "count": len(providers),
+                    "source": "mapbox",
+                }
+        logger.info("[MAPBOX] Not enough real business results; falling back to JSON.")
 
     # Fallback to JSON
     return _find_providers_from_json(category, data, strip_slots=not include_slots)
