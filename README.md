@@ -18,7 +18,7 @@
 
 ---
 
-<!--> -->
+<!--
 <!--**Disclaimer** &mdash; This project was built during a **MIT Hackathon** and was **vibecoded 99%**. Expect rough edges, creative shortcuts, and the unmistakable energy of a 24-hour sprint. Use at your own risk (and amusement).-->
 
 > This work was done in collaboration with [Muhammad Ahmad Amjad](https://github.com/ahmadamjadd)
