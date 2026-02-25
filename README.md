@@ -18,8 +18,9 @@
 
 ---
 
-> **Disclaimer** &mdash; This project was built during a **MIT Hackathon** and was **vibecoded 99%**. Expect rough edges, creative shortcuts, and the unmistakable energy of a 24-hour sprint. Use at your own risk (and amusement).
+<!--> **Disclaimer** &mdash; This project was built during a **MIT Hackathon** and was **vibecoded 99%**. Expect rough edges, creative shortcuts, and the unmistakable energy of a 24-hour sprint. Use at your own risk (and amusement).-->
 
+> This work was done in collaboration with [Muhammad Ahmad Amjad](https://github.com/ahmadamjadd)
 ---
 
 ## The Problem
@@ -163,7 +164,7 @@ hackathon/
 ### 1. Clone & install backend dependencies
 
 ```bash
-git clone https://github.com/abdullahejazjanjua/hackathon.git
+git clone https://github.com/abdullahejazjanjua/callpilot-mit-hackathon.git
 cd hackathon
 pip install -r requirements.txt
 ```
